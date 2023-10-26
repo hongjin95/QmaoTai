@@ -14,7 +14,6 @@ from lxml import etree
 from concurrent.futures import ProcessPoolExecutor
 
 from .jd_logger import logger
-from .timer import Timer
 from .config import global_config
 from .exception import SKException
 from .util import (
@@ -382,7 +381,9 @@ class JdSeckill(object):
         self.seckill_init_info = dict()
         self.seckill_url = dict()
         self.seckill_order_data = dict()
-        self.timers = Timer()
+        start_datetime = datetime.now().strftime("%Y-%m-%d") + ' ' + global_config.getRaw('config', 'start_time')
+        self.start_time = datetime.strptime(start_datetime, "%Y-%m-%d %H:%M:%S")
+        self.stop_time = self.start_time + timedelta(seconds=int(global_config.getRaw('config', 'continue_time')) * 60)
 
         self.session = self.spider_session.get_session()
         self.user_agent = self.spider_session.user_agent
@@ -481,14 +482,13 @@ class JdSeckill(object):
         """用config.ini文件中的continue_time加上函数buytime_get()获取到的buy_time，
             来判断抢购的任务是否可以继续运行
         """
-        buy_time = self.timers.buytime_get()
-        continue_time = int(global_config.getRaw('config', 'continue_time'))
-        stop_time = datetime.strptime(
-            (buy_time + timedelta(minutes=continue_time)).strftime("%Y-%m-%d %H:%M:%S.%f"),
-            "%Y-%m-%d %H:%M:%S.%f"
-        )
+        # continue_time = int(global_config.getRaw('config', 'continue_time'))
+        # stop_time = datetime.strptime(
+        #     (buy_time + timedelta(minutes=continue_time)).strftime("%Y-%m-%d %H:%M:%S.%f"),
+        #     "%Y-%m-%d %H:%M:%S.%f"
+        # )
         current_time = datetime.now()
-        if current_time > stop_time:
+        if current_time > self.stop_time:
             self.running_flag = False
             logger.info('超过允许的运行时间，任务结束。')
 
@@ -592,7 +592,6 @@ class JdSeckill(object):
         """访问商品的抢购链接（用于设置cookie等"""
         logger.info('用户:{}'.format(self.get_username()))
         logger.info('商品名称:{}'.format(self.get_sku_title()))
-        self.timers.start()
         self.seckill_url[self.sku_id] = self.get_seckill_url()
         logger.info('访问商品的抢购连接...')
         headers = {
